@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ASHBOUND</title>
+<link href="https://fonts.googleapis.com/css2?family=UnifrakturMaguntia&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --black:#000; --crimson:#8b0000; --blood:#c0000a; --ash:#b0a090;
+    --bone:#d4c9b0; --ember:#ff4400; --steel:#4a4a5a; --mist:#1a1a2a;
+    --font-title:'UnifrakturMaguntia',cursive; --font-body:'Share Tech Mono',monospace;
+  }
+  html,body { width:100%; height:100%; background:var(--black); color:var(--bone); font-family:var(--font-body); overflow:hidden; }
+  .screen { position:fixed; inset:0; display:none; flex-direction:column; align-items:center; justify-content:center; }
+  .screen.active { display:flex; }
+  /* TITLE */
+  #screen-title { background:var(--black); text-align:center; }
+  #title-bg { position:absolute; inset:0; background-image:url('images/title.png'); background-size:cover; background-position:center; opacity:0.5; }
+  .title-content { position:relative; z-index:2; display:flex; flex-direction:column; align-items:center; gap:1.5rem; }
+  .game-title { font-family:var(--font-title); font-size:clamp(4rem,10vw,8rem); color:var(--blood); text-shadow:0 0 40px rgba(139,0,0,0.8),2px 2px 0 #000; }
+  .title-sub { font-size:0.75rem; color:var(--ash); letter-spacing:0.4em; text-transform:uppercase; }
+  .btn-main { background:none; border:1px solid var(--crimson); color:var(--bone); font-family:var(--font-body); font-size:0.85rem; letter-spacing:0.3em; text-transform:uppercase; padding:0.9rem 3rem; cursor:pointer; transition:all 0.3s; }
+  .btn-main:hover { background:var(--crimson); color:var(--black); }
+  /* GAME */
+  #screen-game { flex-direction:row; align-items:stretch; background:var(--black); }
+  .scene-visual { flex:1; position:relative; overflow:hidden; }
+  .scene-visual::after { content:''; position:absolute; inset:0; background:linear-gradient(to right,transparent 60%,var(--black) 100%); pointer-events:none; }
+  #scene-img { position:absolute; inset:0; background-size:cover; background-position:center; background-color:var(--black); transition:background-image 0.5s; }
+  .game-panel { width:420px; min-width:420px; display:flex; flex-direction:column; background:rgba(0,0,0,0.97); border-left:1px solid rgba(139,0,0,0.3); overflow:hidden; }
+  .stat-bar { padding:0.8rem 1.2rem; border-bottom:1px solid rgba(139,0,0,0.2); display:flex; gap:1rem; }
+  .stat { flex:1; }
+  .stat-label { font-size:0.5rem; letter-spacing:0.3em; text-transform:uppercase; color:var(--steel); margin-bottom:0.2rem; }
+  .stat-val { font-size:0.65rem; color:var(--ash); margin-bottom:0.3rem; }
+  .stat-track { height:2px; background:var(--mist); position:relative; }
+  .stat-fill { height:100%; background:var(--crimson); position:absolute; transition:width 0.5s,left 0.5s; }
+  .stat-mid { position:absolute; left:50%; top:-3px; width:1px; height:8px; background:var(--steel); }
+  .scene-header { padding:1rem 1.2rem 0.5rem; border-bottom:1px solid rgba(139,0,0,0.1); }
+  .scene-num { font-size:0.5rem; letter-spacing:0.4em; color:var(--crimson); text-transform:uppercase; margin-bottom:0.2rem; }
+  .scene-name { font-family:var(--font-title); font-size:1.5rem; color:var(--bone); }
+  .narrative { flex:1; padding:1.2rem; overflow-y:auto; scrollbar-width:thin; scrollbar-color:var(--crimson) transparent; }
+  .narrative p { font-size:0.75rem; line-height:2; color:var(--ash); white-space:pre-wrap; }
+  .choices { padding:0.8rem 1.2rem 1.2rem; display:flex; flex-direction:column; gap:0.4rem; border-top:1px solid rgba(139,0,0,0.15); }
+  .choice-btn { background:none; border:none; border-left:2px solid var(--steel); color:var(--ash); font-family:var(--font-body); font-size:0.7rem; text-align:left; padding:0.6rem 0.8rem; cursor:pointer; transition:all 0.2s; line-height:1.5; }
+  .choice-btn:hover { border-left-color:var(--blood); color:var(--bone); padding-left:1.2rem; background:rgba(139,0,0,0.08); }
+  .choice-num { color:var(--crimson); margin-right:0.4rem; font-size:0.6rem; }
+  /* COMBAT */
+  #screen-combat { flex-direction:row; align-items:stretch; background:var(--black); }
+  .combat-visual { flex:1; position:relative; overflow:hidden; }
+  #combat-img { position:absolute; inset:0; background-size:cover; background-position:center; filter:brightness(0.5); }
+  .combat-visual::after { content:''; position:absolute; inset:0; background:linear-gradient(to right,transparent 50%,var(--black) 100%); pointer-events:none; }
+  .health-hud { position:absolute; bottom:1.5rem; left:1.5rem; right:1.5rem; z-index:10; }
+  .health-row { display:flex; align-items:center; gap:0.6rem; margin-bottom:0.5rem; }
+  .h-label { font-size:0.5rem; letter-spacing:0.3em; text-transform:uppercase; color:var(--ash); width:45px; }
+  .h-track { flex:1; height:3px; background:rgba(255,255,255,0.1); position:relative; }
+  .h-fill { height:100%; background:var(--blood); transition:width 0.4s; }
+  .h-fill.enemy { background:var(--steel); }
+  .h-num { font-size:0.6rem; color:var(--ash); width:30px; text-align:right; }
+  .combat-panel { width:420px; min-width:420px; display:flex; flex-direction:column; background:rgba(0,0,0,0.97); border-left:1px solid rgba(139,0,0,0.3); }
+  .combat-header { padding:1rem 1.2rem; border-bottom:1px solid rgba(139,0,0,0.2); }
+  .combat-name { font-family:var(--font-title); font-size:1.4rem; color:var(--blood); }
+  .combat-turn-label { font-size:0.5rem; letter-spacing:0.3em; color:var(--steel); text-transform:uppercase; margin-top:0.2rem; }
+  .roll-area { padding:1rem 1.2rem; border-bottom:1px solid rgba(139,0,0,0.1); min-height:110px; font-size:0.7rem; line-height:1.9; white-space:pre-wrap; color:var(--ash); }
+  .body-open { padding:0.4rem 1.2rem; font-size:0.55rem; letter-spacing:0.3em; text-transform:uppercase; color:var(--ember); border-bottom:1px solid rgba(139,0,0,0.1); display:none; }
+  .body-open.show { display:block; }
+  .moves-area { flex:1; padding:0.8rem 1.2rem; overflow-y:auto; display:flex; flex-direction:column; gap:0.4rem; }
+  .move-btn { background:none; border:1px solid var(--steel); color:var(--ash); font-family:var(--font-body); font-size:0.65rem; text-align:left; padding:0.6rem 0.8rem; cursor:pointer; transition:all 0.2s; }
+  .move-btn:hover { border-color:var(--blood); color:var(--bone); background:rgba(139,0,0,0.1); }
+  .move-btn.special { border-color:var(--ember); color:var(--ember); }
+  .move-btn:disabled { opacity:0.3; cursor:not-allowed; }
+  .move-title { display:block; margin-bottom:0.2rem; font-size:0.7rem; }
+  .move-info { font-size:0.55rem; color:var(--steel); }
+  .finish-area { padding:0.8rem 1.2rem; border-top:1px solid rgba(139,0,0,0.2); display:none; flex-direction:column; gap:0.4rem; }
+  .finish-area.show { display:flex; }
+  .finish-label { font-size:0.55rem; letter-spacing:0.3em; text-transform:uppercase; color:var(--crimson); margin-bottom:0.2rem; }
+  .finish-btn { background:none; border:1px solid var(--steel); color:var(--ash); font-family:var(--font-body); font-size:0.7rem; padding:0.6rem 0.8rem; cursor:pointer; text-align:left; transition:all 0.2s; }
+  .finish-btn.lethal { border-color:var(--crimson); color:var(--blood); }
+  .finish-btn.lethal:hover { background:rgba(139,0,0,0.2); }
+  .finish-btn.spare:hover { background:rgba(74,74,90,0.2); }
+  /* EULOGY */
+  #screen-eulogy { background:var(--black); flex-direction:column; padding:3rem 2rem; overflow-y:auto; gap:2rem; }
+  .eulogy-title { font-family:var(--font-title); font-size:clamp(2.5rem,6vw,5rem); color:var(--crimson); text-align:center; }
+  .eulogy-divider { width:120px; height:1px; background:linear-gradient(to right,transparent,var(--crimson),transparent); margin:0 auto; }
+  .eulogy-body { max-width:560px; width:100%; margin:0 auto; font-size:0.8rem; line-height:2.2; color:var(--ash); white-space:pre-wrap; text-align:center; }
+  .eulogy-end { max-width:400px; margin:0 auto; }
+  .eulogy-end img { width:100%; }
+  /* OVERLAY */
+  #overlay { position:fixed; inset:0; background:var(--black); z-index:1000; pointer-events:none; opacity:0; transition:opacity 0.4s; }
+  #overlay.dark { opacity:1; }
+  @media(max-width:768px) {
+    #screen-game,#screen-combat { flex-direction:column; }
+    .game-panel,.combat-panel { width:100%; min-width:unset; border-left:none; border-top:1px solid rgba(139,0,0,0.3); }
+    .scene-visual,.combat-visual { height:40vh; flex:none; }
+  }
+</style>
+</head>
+<body>
+<div id="overlay"></div>
+
+<!-- TITLE -->
+<div class="screen active" id="screen-title">
+  <div id="title-bg"></div>
+  <div class="title-content">
+    <h1 class="game-title">Ashbound</h1>
+    <p class="title-sub">You broke your oath to survive</p>
+    <button class="btn-main" onclick="startGame()">Begin</button>
+  </div>
+</div>
+
+<!-- GAME -->
+<div class="screen" id="screen-game">
+  <div class="scene-visual"><div id="scene-img"></div></div>
+  <div class="game-panel">
+    <div class="stat-bar">
+      <div class="stat">
+        <div class="stat-label">Morality</div>
+        <div class="stat-val" id="s-morality">Neither</div>
+        <div class="stat-track"><div class="stat-fill" id="f-morality" style="width:0%;left:50%"></div><div class="stat-mid"></div></div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Fear</div>
+        <div class="stat-val" id="s-fear">Composed</div>
+        <div class="stat-track"><div class="stat-fill" id="f-fear" style="width:0%;left:50%"></div><div class="stat-mid"></div></div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Fatigue</div>
+        <div class="stat-val" id="s-fatigue">Steady</div>
+        <div class="stat-track"><div class="stat-fill" id="f-fatigue" style="width:0%;left:50%"></div><div class="stat-mid"></div></div>
+      </div>
+    </div>
+    <div class="scene-header">
+      <div class="scene-num" id="scene-num">Scene 01</div>
+      <div class="scene-name" id="scene-name">—</div>
+    </div>
+    <div class="narrative"><p id="narrative-text">Loading...</p></div>
+    <div class="choices" id="choices"></div>
+  </div>
+</div>
+
+<!-- COMBAT -->
+<div class="screen" id="screen-combat">
+  <div class="combat-visual">
+    <div id="combat-img"></div>
+    <div class="health-hud">
+      <div class="health-row"><div class="h-label">You</div><div class="h-track"><div class="h-fill" id="ph" style="width:100%"></div></div><div class="h-num" id="ph-num">100</div></div>
+      <div class="health-row"><div class="h-label">Enemy</div><div class="h-track"><div class="h-fill enemy" id="eh" style="width:100%"></div></div><div class="h-num" id="eh-num">100</div></div>
+    </div>
+  </div>
+  <div class="combat-panel">
+    <div class="combat-header">
+      <div class="combat-name" id="combat-name">Combat</div>
+      <div class="combat-turn-label" id="combat-turn">Turn 1</div>
+    </div>
+    <div class="roll-area" id="roll-area">Choose your move.</div>
+    <div class="body-open" id="body-open">⚡ Head is open — Headshot available</div>
+    <div class="moves-area" id="moves-area"></div>
+    <div class="finish-area" id="finish-area">
+      <div class="finish-label">Enemy is down. What do you do?</div>
+      <button class="finish-btn lethal" onclick="finishCombat(true)">Finish it.</button>
+      <button class="finish-btn spare" onclick="finishCombat(false)">Walk away. Let him live.</button>
+    </div>
+  </div>
+</div>
+
+<!-- EULOGY -->
+<div class="screen" id="screen-eulogy">
+  <div class="eulogy-title">Ashbound</div>
+  <div class="eulogy-divider"></div>
+  <div class="eulogy-body" id="eulogy-body"></div>
+  <div class="eulogy-end"><img src="images/scene10.png" alt=""></div>
+  <button class="btn-main" onclick="restartGame()" style="margin-top:1rem">Begin Again</button>
+</div>
+
+<script>
+const IMAGES = {1:'images/scene01.png',2:'images/scene02.png',3:'images/scene03.png',4:'images/scene04.png',5:'images/scene05.png',6:'images/scene06.png',7:'images/scene07.png',8:'images/scene08.png',9:'images/scene09.png',10:'images/scene10.png'};
+const COMBAT_IMAGES = {SCENE_04:'images/scene04.png',SCENE_06:'images/scene06.png',SCENE_08:'images/scene08.png'};
+const COMBAT_NAMES  = {SCENE_04:'The Oath-Keeper',SCENE_06:'The Hollow Man',SCENE_08:'The Familiar Face'};
+const MOVES = {
+  BODY_SHOT:{name:'Body Shot',desc:'Strike the body. Opens the head.',base:60},
+  HEADSHOT:{name:'Headshot',desc:'Finishing move. Requires body open.',base:80},
+  MEASURED_STRIKE:{name:'Measured Strike',desc:'Controlled. Sets up body shot.',base:65},
+  DESPERATE_LUNGE:{name:'Desperate Lunge',desc:'All in. Miss leaves you open.',base:75},
+  READ_HIM:{name:'Read Him',desc:'No attack. +20% to next strike.',base:null},
+  INTIMIDATE:{name:'Intimidate',desc:'Use their fear. Works once.',base:55},
+  RESTRAINED_STRIKE:{name:'Restrained Strike',desc:'Non-lethal. Disarm rather than destroy.',base:60},
+  TALK_HIM_DOWN:{name:'Talk Him Down',desc:'Stop fighting. Make him hear you.',base:70},
+  END_THIS:{name:'End This',desc:'Brutal. Efficient. Final.',base:80},
+};
+let combatTurn=1;
+
+async function api(method,path,body){
+  try{
+    const opts={method,headers:{'Content-Type':'application/json'},credentials:'include'};
+    if(body) opts.body=JSON.stringify(body);
+    const res=await fetch('/api/game'+path,opts);
+    const json=await res.json();
+    return json.data!==undefined?json.data:json;
+  }catch(e){console.error('API error:',e);return null;}
+}
+
+function show(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById('screen-'+id).classList.add('active');}
+async function fade(fn){const o=document.getElementById('overlay');o.classList.add('dark');await wait(400);await fn();o.classList.remove('dark');}
+function wait(ms){return new Promise(r=>setTimeout(r,ms));}
+
+async function startGame(){
+  await fade(async()=>{
+    await api('POST','/start');
+    await loadScene(1);
+    show('game');
+  });
+}
+
+async function restartGame(){
+  await fade(async()=>{
+    await api('POST','/start');
+    await loadScene(1);
+    show('game');
+  });
+}
+
+async function loadScene(n){
+  const data=await api('GET','/scene/'+n);
+  if(!data){document.getElementById('narrative-text').textContent='Error loading scene.';return;}
+  const img=IMAGES[n];
+  document.getElementById('scene-img').style.backgroundImage=img?`url('${img}')`:'none';
+  document.getElementById('scene-num').textContent='Scene '+String(n).padStart(2,'0');
+  document.getElementById('scene-name').textContent=data.title||'';
+  document.getElementById('narrative-text').textContent=data.text||'';
+  const choicesEl=document.getElementById('choices');
+  choicesEl.innerHTML='';
+  if(data.isCombat){
+    const btn=document.createElement('button');
+    btn.className='choice-btn';
+    btn.innerHTML='<span class="choice-num">▶</span>Enter combat.';
+    btn.onclick=()=>enterCombat('SCENE_0'+n);
+    choicesEl.appendChild(btn);
+  }else if(n===10){
+    await wait(1000);getEulogy();
+  }else{
+    (data.choices||[]).forEach((text,i)=>{
+      const btn=document.createElement('button');
+      btn.className='choice-btn';
+      btn.innerHTML=`<span class="choice-num">${i+1}.</span>${text}`;
+      btn.onclick=()=>makeChoice(n,i+1);
+      choicesEl.appendChild(btn);
+    });
+  }
+}
+
+async function makeChoice(scene,choice){
+  document.querySelectorAll('.choice-btn').forEach(b=>b.disabled=true);
+  const data=await api('POST','/choice',{scene,choice});
+  if(!data)return;
+  updateStats(data.state);
+  if(data.type==='COMBAT'){await fade(()=>enterCombatScreen(data.combatScene));return;}
+  if(data.narrative){document.getElementById('narrative-text').textContent=data.narrative;document.getElementById('choices').innerHTML='';await wait(1500);}
+  const next=data.state&&data.state.currentScene;
+  if(!next)return;
+  await fade(async()=>{show('game');await loadScene(next);});
+}
+
+function enterCombat(sceneId){fade(()=>enterCombatScreen(sceneId));}
+
+function enterCombatScreen(sceneId){
+  combatTurn=1;
+  document.getElementById('combat-img').style.backgroundImage=`url('${COMBAT_IMAGES[sceneId]||""}')`;
+  document.getElementById('combat-name').textContent=COMBAT_NAMES[sceneId]||'Combat';
+  document.getElementById('combat-turn').textContent='Turn 1 — Choose your move';
+  document.getElementById('roll-area').textContent='Choose your move.';
+  document.getElementById('ph').style.width='100%';document.getElementById('eh').style.width='100%';
+  document.getElementById('ph-num').textContent='100';document.getElementById('eh-num').textContent='100';
+  document.getElementById('body-open').classList.remove('show');
+  document.getElementById('finish-area').classList.remove('show');
+  loadMoves(defaultMoves(sceneId));
+  show('combat');
+}
+
+function defaultMoves(id){
+  switch(id){
+    case'SCENE_04':return['BODY_SHOT','HEADSHOT','MEASURED_STRIKE','DESPERATE_LUNGE'];
+    case'SCENE_06':return['BODY_SHOT','HEADSHOT','MEASURED_STRIKE','DESPERATE_LUNGE','READ_HIM','INTIMIDATE'];
+    case'SCENE_08':return['BODY_SHOT','HEADSHOT','DESPERATE_LUNGE','END_THIS'];
+    default:return['BODY_SHOT','HEADSHOT'];
+  }
+}
+
+function loadMoves(list){
+  const area=document.getElementById('moves-area');area.innerHTML='';
+  list.forEach(id=>{
+    const m=MOVES[id];if(!m)return;
+    const btn=document.createElement('button');
+    btn.className='move-btn'+(id==='END_THIS'||id==='HEADSHOT'?' special':'');
+    btn.innerHTML=`<span class="move-title">${m.name}${m.base?` <span style="color:var(--steel);font-size:0.55rem">(${m.base}%)</span>`:''}</span><span class="move-info">${m.desc}</span>`;
+    btn.onclick=()=>doMove(id);
+    area.appendChild(btn);
+  });
+}
+
+async function doMove(move){
+  document.querySelectorAll('.move-btn').forEach(b=>b.disabled=true);
+  const data=await api('POST','/combat/move',{move});
+  if(!data){document.querySelectorAll('.move-btn').forEach(b=>b.disabled=false);return;}
+  combatTurn++;
+  document.getElementById('combat-turn').textContent=`Turn ${combatTurn}`;
+  const rollEl=document.getElementById('roll-area');rollEl.textContent='';
+  if(data.breakdown){const lines=data.breakdown.split('\n');for(const line of lines){await wait(100);rollEl.textContent+=line+'\n';}}
+  if(data.playerHealth!==undefined){
+    document.getElementById('ph').style.width=data.playerHealth+'%';
+    document.getElementById('eh').style.width=data.enemyHealth+'%';
+    document.getElementById('ph-num').textContent=data.playerHealth;
+    document.getElementById('eh-num').textContent=data.enemyHealth;
+  }
+  if(data.bodyOpen)document.getElementById('body-open').classList.add('show');
+  else document.getElementById('body-open').classList.remove('show');
+  await wait(500);
+  if(data.fightOver){
+    if(data.outcome==='ENEMY_DOWN_PENDING')document.getElementById('finish-area').classList.add('show');
+    else await endFight(data.outcome);
+    return;
+  }
+  if(data.availableMoves&&data.availableMoves.length>0)loadMoves(data.availableMoves);
+  else document.querySelectorAll('.move-btn').forEach(b=>b.disabled=false);
+}
+
+async function finishCombat(lethal){
+  document.getElementById('finish-area').classList.remove('show');
+  const data=await api('POST','/combat/finish',{lethal});
+  if(data&&data.state)updateStats(data.state);
+  await wait(600);await endFight(lethal?'WIN_LETHAL':'WIN_NON_LETHAL');
+}
+
+async function endFight(outcome){
+  const state=await api('GET','/state');
+  if(state&&state.state)updateStats(state.state);
+  const next=state&&state.state&&state.state.currentScene;
+  await fade(async()=>{show('game');if(next)await loadScene(next);});
+}
+
+async function getEulogy(){
+  const data=await api('GET','/eulogy');
+  if(!data)return;
+  document.getElementById('eulogy-body').textContent=data.eulogy||'';
+  await fade(()=>show('eulogy'));
+}
+
+function updateStats(state){
+  if(!state)return;
+  ['morality','fear','fatigue'].forEach(stat=>{
+    const lEl=document.getElementById('s-'+stat);
+    const fEl=document.getElementById('f-'+stat);
+    if(lEl)lEl.textContent=state[stat+'Label']||'';
+    if(fEl){const val=state[stat]||0;const pct=Math.abs(val)/2;fEl.style.width=pct+'%';fEl.style.left=val>=0?'50%':(50-pct)+'%';}
+  });
+}
+</script>
+</body>
+</html>
